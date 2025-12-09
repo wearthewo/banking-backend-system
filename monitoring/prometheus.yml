@@ -1,0 +1,101 @@
+global:
+  scrape_interval: ${PROMETHEUS_SCRAPE_INTERVAL:15s}
+  evaluation_interval: 30s
+  scrape_timeout: 10s
+
+# Alert manager configuration
+alerting:
+  alertmanagers:
+    - scheme: http
+      timeout: 10s
+      api_version: v2
+      static_configs:
+        - targets: ['alertmanager:9093']
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: __param_target
+        - target_label: __address__
+          replacement: alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  - 'alerts.yml'
+  # - 'first_rules.yml'
+  # - 'second_rules.yml'
+
+# A scrape configuration containing exactly one endpoint to scrape:
+scrape_configs:
+  # Banking application
+  - job_name: 'banking-app'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          application: 'banking-backend'
+          environment: '${APP_ENV:dev}'
+    metrics_path_override: '/actuator/prometheus'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __metrics_path__
+        regex: (.+)/?\d*
+        replacement: ${1}/actuator/prometheus
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node exporter (system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: (.*)\:.*
+        target_label: instance
+        replacement: $1
+
+  # Kafka metrics
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka:7071']  # Kafka JMX Exporter port
+    metrics_path: /metrics
+
+  # MySQL metrics
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysql:9104']  # MySQL Exporter port
+    metrics_path: /metrics
+
+  # Application business metrics
+  - job_name: 'business-metrics'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          application: 'banking-backend'
+          environment: '${APP_ENV:dev}'
+    metrics_path_override: '/actuator/prometheus'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __metrics_path__
+        regex: (.+)/?\d*
+        replacement: ${1}/actuator/prometheus
+
+  # Alertmanager
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+
+  # MySQL exporter (if you add it later)
+  # - job_name: 'mysql'
+  #   static_configs:
+  #     - targets: ['mysql-exporter:9104']
+
+  # Kafka exporter (if you add it later)
+  # - job_name: 'kafka'
+  #   static_configs:
+  #     - targets: ['kafka-exporter:9308']
+
+  # Add any additional scrape configurations here

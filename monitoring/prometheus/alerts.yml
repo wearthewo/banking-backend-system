@@ -1,0 +1,130 @@
+groups:
+- name: application-alerts
+  rules:
+  # Application Health
+  - alert: ApplicationDown
+    expr: up{job=~"banking-app|business-metrics"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Application {{ $labels.instance }} is down"
+      description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute"
+
+  - alert: HighErrorRate
+    expr: (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) by (instance, uri) / sum(rate(http_server_requests_seconds_count[5m])) by (instance, uri)) * 100 > 5
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High error rate on {{ $labels.instance }}"
+      description: "Error rate is {{ $value | humanize }}% for {{ $labels.uri }}"
+
+  - alert: HighLatency
+    expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, uri, method)) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High latency on {{ $labels.instance }}"
+      description: "95th percentile latency is {{ $value | humanize }}s for {{ $labels.method }} {{ $labels.uri }}"
+
+- name: jvm-alerts
+  rules:
+  - alert: HighJvmMemoryUsage
+    expr: (sum(jvm_memory_used_bytes{area="heap"}) by (instance) / sum(jvm_memory_max_bytes{area="heap"}) by (instance)) * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High JVM memory usage on {{ $labels.instance }}"
+      description: "JVM memory usage is {{ $value | humanize }}%"
+
+  - alert: HighGcPauseTime
+    expr: rate(jvm_gc_pause_seconds_sum{action="end of minor GC"}[5m]) / rate(jvm_gc_pause_seconds_count{action="end of minor GC"}[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High GC pause time on {{ $labels.instance }}"
+      description: "GC pause time is {{ $value | humanize }} seconds"
+
+- name: system-alerts
+  rules:
+  - alert: HighCpuUsage
+    expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage on {{ $labels.instance }}"
+      description: "CPU usage is {{ $value | humanize }}%"
+
+  - alert: HighMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage on {{ $labels.instance }}"
+      description: "Memory usage is {{ $value | humanize }}%"
+
+- name: kafka-alerts
+  rules:
+  - alert: KafkaBrokerDown
+    expr: up{job="kafka"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Kafka broker is down"
+      description: "Kafka broker {{ $labels.instance }} is down"
+
+  - alert: HighKafkaConsumerLag
+    expr: kafka_consumer_consumer_lag_seconds > 300
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High consumer lag for {{ $labels.topic }}"
+      description: "Consumer lag is {{ $value | humanize }} seconds for topic {{ $labels.topic }} in group {{ $labels.consumer_group }}"
+
+  - alert: UnderReplicatedPartitions
+    expr: kafka_server_replicamanager_underreplicated > 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Under-replicated partitions in Kafka"
+      description: "{{ $value }} under-replicated partitions detected"
+
+- name: database-alerts
+  rules:
+  - alert: HighConnectionPoolUsage
+    expr: (sum(hikaricp_connections_active) by (pool) / sum(hikaricp_connections_max) by (pool)) * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High connection pool usage for {{ $labels.pool }}"
+      description: "Connection pool usage is {{ $value | humanize }}%"
+
+  - alert: HighConnectionAcquisitionTime
+    expr: histogram_quantile(0.95, rate(hikaricp_connections_acquired_seconds_bucket[5m])) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High connection acquisition time for {{ $labels.pool }}"
+      description: "95th percentile connection acquisition time is {{ $value | humanize }} seconds"
+
+  - alert: HighActiveTransactions
+    expr: rate(hikaricp_connections_active[5m]) > 10
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High number of active database connections"
+      description: "{{ $value | humanize }} active database connections detected"
+      summary: "Service {{ $labels.instance }} is down"
+      description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."

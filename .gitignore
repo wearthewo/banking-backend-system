@@ -1,0 +1,54 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+*.log
+
+# VS Code
+.vscode/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+logs/
+
+# Docker
+**/target/
+**/build/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Application specific
+data/
+!**/src/main/**/data/
+!**/src/test/**/data/
+
+# Build output
+banking-backend-system-*.jar
+
+# Local configuration files
+application-local.yml
+application-dev.yml
+application-prod.yml
+
+# Flyway
+**/db/migration/
+!**/src/main/resources/db/migration/
+
+# Docker Compose
+**/docker-compose.override.yml
+
+# Grafana
+**/grafana/data/
+
+# Prometheus
+**/prometheus/data/

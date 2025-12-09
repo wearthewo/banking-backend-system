@@ -1,0 +1,114 @@
+spring:
+  application:
+    name: ${APP_NAME:banking-backend-system}
+  profiles:
+    active: ${APP_ENV:dev}
+  
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:banking_db}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${DB_USER:banking_user}
+    password: ${DB_PASSWORD:StrongPassword123!}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+      minimum-idle: 5
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+  
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:banking-group}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+server:
+  port: ${APP_PORT:8080}
+  servlet:
+    context-path: /api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    web:
+      server:
+        request:
+          autotime:
+            enabled: true
+            percentiles: 0.5,0.75,0.95,0.99
+
+jwt:
+  secret-key: ${JWT_SECRET:your-256-bit-secret-key-make-it-very-long-and-secure}
+  expiration-time: 86400000  # 24 hours in milliseconds
+
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    org.springframework: ${LOG_LEVEL:INFO}
+    com.banking: ${LOG_LEVEL:DEBUG}
+  file:
+    name: logs/application.log
+    max-size: 10MB
+    max-history: 7
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:your-256-bit-secret-key-make-this-very-secure-in-production}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
+  
+  admin:
+    email: ${ADMIN_EMAIL:admin@bank.com}
+    password: ${ADMIN_PASSWORD:Admin@1234}
+    firstName: ${ADMIN_FIRST_NAME:System}
+    lastName: ${ADMIN_LAST_NAME:Administrator}
+
+
+    spring:
+      mail:
+        host: smtp.your-email-provider.com  # e.g., smtp.gmail.com
+        port: 587
+        username: your-email@example.com
+        password: your-email-password
+        properties:
+          mail:
+            smtp:
+              auth: true
+              starttls:
+                enable: true

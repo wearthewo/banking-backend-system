@@ -1,0 +1,106 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  IMAGE_NAME: banking-backend
+  # Remove hardcoded localhost for production use
+  # PROMETHEUS_URL should be set in GitHub Secrets
+  PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest  # Changed from self-hosted to GitHub-hosted runner
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      - name: Run tests
+        run: mvn test -Dspring.datasource.url=jdbc:mysql://localhost:3306/test_db -Dspring.datasource.username=root -Dspring.datasource.password=root
+
+  build-and-push-docker:
+    needs: build-and-test
+    runs-on: ubuntu-latest  # Changed from self-hosted to GitHub-hosted runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  send-metrics:
+    needs: build-and-push-docker
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send workflow metrics to Prometheus
+        uses: prometheus-community/action@v1.0.0
+        with:
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
+          metrics_name: 'github_actions_workflow'
+          metrics_labels: 'workflow=${{ github.workflow }},job=${{ github.job }},status=${{ job.status }},repo=${{ github.repository }},branch=${{ github.ref_name }},actor=${{ github.actor }}'
+          metrics_value: 1
+          metrics_type: counter
+          
+      - name: Send workflow duration metrics
+        uses: prometheus-community/action@v1.0.0
+        with:
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
+          metrics_name: 'github_actions_workflow_duration_seconds'
+          metrics_labels: 'workflow=${{ github.workflow }},job=${{ github.job }},repo=${{ github.repository }},branch=${{ github.ref_name }}'
+          metrics_value: ${{ github.event.workflow_run.run_duration_ms / 1000 }}
+          metrics_type: gauge
+          
+      - name: Send job status metrics
+        uses: prometheus-community/action@v1.0.0
+        with:
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
+          metrics_name: 'github_actions_job_status'
+          metrics_labels: 'workflow=${{ github.workflow }},job=${{ github.job }},status=${{ job.status }},conclusion=${{ job.status == 'success' && 'success' || 'failure' }}'
+          metrics_value: 1
+          metrics_type: counter

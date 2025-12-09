@@ -97,7 +97,7 @@ jobs:
             job: ${{ github.job }}
             repo: ${{ github.repository }}
             branch: ${{ github.ref_name }}
-          metrics_value: ${{ (github.event.workflow_run.run_duration_ms / 1000) | toJson }}
+          metrics_value: ${{ github.event.workflow_run.run_duration_ms / 1000 }}
           metrics_type: gauge
           
       - name: Send job status metrics

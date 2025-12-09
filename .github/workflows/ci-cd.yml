@@ -101,6 +101,6 @@ jobs:
         with:
           prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
           metrics_name: 'github_actions_job_status'
-          metrics_labels: 'workflow=${{ github.workflow }},job=${{ github.job }},status=${{ job.status }},conclusion=${{ job.status == 'success' && 'success' || 'failure' }}'
+          metrics_labels: 'workflow=${{ github.workflow }},job=${{ github.job }},status=${{ job.status }},conclusion=${{ job.status }}'
           metrics_value: 1
           metrics_type: counter

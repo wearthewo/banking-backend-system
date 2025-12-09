@@ -92,8 +92,12 @@ jobs:
         with:
           prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
           metrics_name: 'github_actions_workflow_duration_seconds'
-          metrics_labels: 'workflow=${{ github.workflow }},job=${{ github.job }},repo=${{ github.repository }},branch=${{ github.ref_name }}'
-          metrics_value: ${{ github.event.workflow_run.run_duration_ms / 1000 }}
+          metrics_labels: |
+            workflow: ${{ github.workflow }}
+            job: ${{ github.job }}
+            repo: ${{ github.repository }}
+            branch: ${{ github.ref_name }}
+          metrics_value: ${{ (github.event.workflow_run.run_duration_ms / 1000) | toJson }}
           metrics_type: gauge
           
       - name: Send job status metrics
@@ -101,6 +105,10 @@ jobs:
         with:
           prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
           metrics_name: 'github_actions_job_status'
-          metrics_labels: 'workflow=${{ github.workflow }},job=${{ github.job }},status=${{ job.status }},conclusion=${{ job.status }}'
+          metrics_labels: |
+            workflow: ${{ github.workflow }}
+            job: ${{ github.job }}
+            status: ${{ job.status }}
+            conclusion: ${{ job.status }}
           metrics_value: 1
           metrics_type: counter

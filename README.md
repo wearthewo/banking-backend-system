@@ -1,109 +1,165 @@
-# Banking Backend System
+# Banking System - Technical Documentation
 
-A secure and scalable banking backend system built with Spring Boot, Kafka, and MySQL, featuring monitoring with Prometheus and Grafana.
+## System Architecture
 
-## Features
+The banking system follows a microservices architecture with event-driven communication. Here's the high-level architecture:
 
-- **Account Management**: Create, read, update, and delete accounts
-- **Transaction Processing**: Secure money transfers between accounts
-- **Event-Driven Architecture**: Using Apache Kafka for asynchronous processing
-- **Monitoring**: Integrated Prometheus and Grafana for observability
-- **Containerized**: Easy deployment with Docker and Docker Compose
-- **CI/CD**: GitHub Actions workflow for automated testing and deployment
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│  API Gateway    │◄───►│  Auth Service   │◄───►│    MySQL DB     │
+│  (Spring Cloud  │     │  (JWT)          │     │  (Accounts)     │
+│   Gateway)      │     │                 │     │                 │
+└────────┬────────┘     └─────────────────┘     └─────────────────┘
+         │
+         │  HTTP/HTTPS
+         │
+┌────────▼────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│  Transaction    │     │  Notification   │     │   Kafka Topics  │
+│  Service        │◄───►│  Service        │◄───►│   (Events)      │
+│                 │     │  (Email/SMS)    │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+         │
+         │  gRPC
+         │
+┌────────▼────────┐     ┌─────────────────┐
+│                 │     │                 │
+│  Reporting      │     │  Audit Service  │
+│  Service        │◄───►│  (MongoDB)      │
+│  (Batch)        │     │                 │
+└─────────────────┘     └─────────────────┘
+```
 
-## Prerequisites
+## Service Communication
 
-- Java 17+
-- Maven 3.8+
-- Docker 20.10+
-- Docker Compose 2.0+
-- MySQL 8.0+
-- Kafka 3.0+
+### 1. Synchronous Communication (HTTP/REST)
+- **API Gateway** handles all incoming requests and routes them to appropriate services
+- Service-to-service communication for time-sensitive operations
+- Used for:
+  - User authentication/authorization
+  - Account management
+  - Balance inquiries
 
-## Getting Started
+### 2. Asynchronous Communication (Kafka)
+- **Transaction Processing Flow**:
+  1. Transaction request received by API Gateway
+  2. Transaction Service validates and publishes event to Kafka
+  3. Multiple consumers process the event:
+     - Update account balances
+     - Send notifications
+     - Log audit trail
+     - Update reporting data
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/banking-backend-system.git
-   cd banking-backend-system
-   ```
+### 3. gRPC Communication
+- Used for high-performance service-to-service communication
+- Implemented for:
+  - Real-time balance updates
+  - High-frequency data exchange
+  - Internal service communication
 
-2. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+## Data Flow
 
-3. **Build the application**
-   ```bash
-   mvn clean install
-   ```
+### Transaction Processing
+1. Client initiates transaction via REST API
+2. API Gateway authenticates and routes to Transaction Service
+3. Transaction Service:
+   - Validates transaction
+   - Publishes `TransactionInitiated` event
+   - Updates transaction status
+4. Event consumers process in parallel:
+   - Account Service: Updates balances
+   - Notification Service: Sends alerts
+   - Audit Service: Records transaction
+   - Reporting Service: Updates analytics
 
-4. **Start the services**
+## Monitoring and Observability
+
+### Prometheus
+- Scrapes metrics from all services
+- Collects:
+  - Application metrics (JVM, request rates)
+  - System metrics (CPU, memory)
+  - Business metrics (transactions per second)
+
+### Grafana
+- Pre-configured dashboards:
+  - API Performance
+  - Error Rates
+  - Transaction Volume
+  - System Health
+
+### Alertmanager
+- Handles alerts from Prometheus
+- Sends notifications for:
+  - Service outages
+  - Performance degradation
+  - Business anomalies
+
+## CI/CD Pipeline
+
+### 1. Build and Test
+- Triggered on push/PR
+- Runs:
+  - Unit tests
+  - Integration tests
+  - Code quality checks
+  - Security scans
+
+### 2. Docker Build
+- Builds container images
+- Pushes to container registry
+- Tags with git commit hash
+
+### 3. Deployment
+- Blue-green deployment to staging
+- Automated rollback on failure
+- Canary releases to production
+
+## Environment Variables
+
+Key environment variables (see `.env.example` for full list):
+
+```env
+# Database
+DB_URL=jdbc:mysql://mysql:3306/banking
+DB_USER=user
+DB_PASSWORD=password
+
+# Kafka
+KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+
+# JWT
+JWT_SECRET=your-secret-key
+JWT_EXPIRATION=86400000
+
+# Monitoring
+PROMETHEUS_METRICS_ENABLED=true
+MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,prometheus
+```
+
+## Local Development Setup
+
+1. Start all services:
    ```bash
    docker-compose up -d
    ```
 
-5. **Access the application**
-   - API: http://localhost:8080/api
-   - Swagger UI: http://localhost:8080/api/swagger-ui.html
+2. Access services:
+   - API: http://localhost:8080
    - Prometheus: http://localhost:9090
-   - Grafana: http://localhost:3000 (admin/admin)
+   - Grafana: http://localhost:3000
    - Kafka UI: http://localhost:8081
 
-## Project Structure
+3. Run tests:
+   ```bash
+   mvn test
+   ```
 
-```
-banking-backend-system/
-├── src/
-│   ├── main/
-│   │   ├── java/com/banking/...
-│   │   └── resources/
-│   └── test/
-├── monitoring/
-│   ├── grafana/
-│   └── prometheus/
-├── .github/workflows/
-├── .env.example
-├── docker-compose.yml
-├── Dockerfile
-└── pom.xml
-```
+## Production Deployment
 
-## API Documentation
-
-API documentation is available via Swagger UI at:
-http://localhost:8080/api/swagger-ui.html
-
-## Monitoring
-
-The application includes monitoring with:
-- **Prometheus**: Metrics collection
-- **Grafana**: Visualization dashboards
-- **Actuator**: Health checks and metrics
-
-## CI/CD
-
-The project includes a GitHub Actions workflow for:
-- Building and testing on push/pr
-- Building and pushing Docker images
-- Deploying to staging/production (configured in GitHub Secrets)
-
-## Security
-
-- JWT-based authentication
-- Password hashing with BCrypt
-- Environment-based configuration
-- Secure defaults for all services
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+1. Set up environment variables in production
+2. Configure monitoring and alerting
+3. Set up backup and recovery
+4. Configure scaling policies
+5. Enable security features (TLS, WAF, etc.)

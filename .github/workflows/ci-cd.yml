@@ -73,42 +73,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  send-metrics:
+  workflow-status:
     needs: build-and-push-docker
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Send workflow metrics to Prometheus
-        uses: prometheus-community/action@v1.0.0
-        with:
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
-          metrics_name: 'github_actions_workflow'
-          metrics_labels: 'workflow=${{ github.workflow }},job=${{ github.job }},status=${{ job.status }},repo=${{ github.repository }},branch=${{ github.ref_name }},actor=${{ github.actor }}'
-          metrics_value: 1
-          metrics_type: counter
-          
-      - name: Send workflow duration metrics
-        uses: prometheus-community/action@v1.0.0
-        with:
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
-          metrics_name: 'github_actions_workflow_duration_seconds'
-          metrics_labels: |
-            workflow: ${{ github.workflow }}
-            job: ${{ github.job }}
-            repo: ${{ github.repository }}
-            branch: ${{ github.ref_name }}
-          metrics_value: 1
-          metrics_type: gauge
-
-      - name: Send job status metrics
-        uses: prometheus-community/action@v1.0.0
-        with:
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || 'http://localhost:9090' }}
-          metrics_name: 'github_actions_job_status'
-          metrics_labels: |
-            workflow: ${{ github.workflow }}
-            job: ${{ github.job }}
-            status: ${{ job.status }}
-            conclusion: ${{ job.status }}
-          metrics_value: 1
-          metrics_type: counter
+      - name: Log workflow status
+        run: |
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Job: ${{ github.job }}"
+          echo "Status: ${{ job.status }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Actor: ${{ github.actor }}"

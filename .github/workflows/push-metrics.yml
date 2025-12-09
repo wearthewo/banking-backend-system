@@ -1,0 +1,52 @@
+name: Push Workflow Metrics to Pushgateway
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types:
+      - completed
+
+jobs:
+  push-metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get workflow duration
+        id: workflow_duration
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: workflowRun } = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }}
+            });
+            
+            const duration = (new Date(workflowRun.updated_at) - new Date(workflowRun.created_at)) / 1000; // in seconds
+            return duration;
+
+      - name: Push metrics to Pushgateway
+        run: |
+          WORKFLOW_NAME="${{ github.workflow }}"
+          JOB_NAME="${{ github.job }}"
+          STATUS="${{ job.status }}"
+          REPO="${{ github.repository }}"
+          BRANCH="${{ github.ref_name }}"
+          ACTOR="${{ github.actor }}"
+          DURATION="${{ steps.workflow_duration.outputs.result }}"
+          
+          # Push workflow duration metric
+          cat <<EOF | curl --data-binary @- ${{ secrets.PUSHGATEWAY_URL || 'http://localhost:9091' }}/metrics/job/github_actions/instance/pushgateway
+            # TYPE github_actions_workflow_duration_seconds gauge
+            # HELP github_actions_workflow_duration_seconds Duration of GitHub Actions workflow in seconds
+            github_actions_workflow_duration_seconds{workflow="$WORKFLOW_NAME",job="$JOB_NAME",repo="$REPO",branch="$BRANCH",actor="$ACTOR",status="$STATUS"} $DURATION
+          EOF
+          
+          # Push workflow status metric (1 for success, 0 for failure)
+          STATUS_CODE=${{ job.status == 'success' && echo 1 || echo 0 }}
+          cat <<EOF | curl --data-binary @- ${{ secrets.PUSHGATEWAY_URL || 'http://localhost:9091' }}/metrics/job/github_actions/instance/pushgateway
+            # TYPE github_actions_workflow_status gauge
+            # HELP github_actions_workflow_status Status of GitHub Actions workflow (1=success, 0=failure)
+            github_actions_workflow_status{workflow="$WORKFLOW_NAME",job="$JOB_NAME",repo="$REPO",branch="$BRANCH",actor="$ACTOR"} $STATUS_CODE
+          EOF
+        env:
+          PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}

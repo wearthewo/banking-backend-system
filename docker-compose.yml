@@ -99,7 +99,7 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -108,10 +108,24 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--web.enable-lifecycle'
     depends_on:
-      - banking-app
-    restart: unless-stopped
+      - alertmanager
+      - pushgateway
     networks:
       - banking-network
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    networks:
+      - banking-network
+    command:
+      - '--web.enable-admin-api'
+      - '--persistence.file=/tmp/pushgateway.data'
+    volumes:
+      - pushgateway_data:/tmp
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
